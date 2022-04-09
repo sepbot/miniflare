@@ -805,32 +805,35 @@ export async function fetch(
   }
 
   // Convert the response to our hybrid Response
-  let res: Response;
-  if (baseRes.type === "opaqueredirect") {
-    // Unpack opaque responses. This restriction isn't needed server-side,
-    // and Cloudflare doesn't support Response types anyway.
-    // @ts-expect-error symbol properties are not included in type definitions
-    const internalResponse = baseRes[fetchSymbols.kState].internalResponse;
-    const headersList = internalResponse.headersList;
-    assert(headersList.length % 2 === 0);
-    const headers = new Headers();
-    for (let i = 0; i < headersList.length; i += 2) {
-      headers.append(headersList[i], headersList[i + 1]);
-    }
-    // Cloudflare returns a body here, but undici aborts the stream so
-    // unfortunately it's unusable :(
-    res = new Response(null, {
-      status: internalResponse.status,
-      statusText: internalResponse.statusText,
-      headers,
-    });
-  } else {
-    // https://fetch.spec.whatwg.org/#null-body-status
-    res = new Response(
-      nullBodyStatus.includes(baseRes.status) ? null : baseRes.body,
-      baseRes
-    );
+  // let res: Response;
+  // if (baseRes.type === "opaqueredirect") {
+  // Unpack opaque responses. This restriction isn't needed server-side,
+  // and Cloudflare doesn't support Response types anyway.
+  // @ts-expect-error symbol properties are not included in type definitions
+  const internalResponse = baseRes[fetchSymbols.kState].internalResponse;
+  const headersList = internalResponse.headersList;
+  assert(headersList.length % 2 === 0);
+  const headers = new Headers();
+  for (let i = 0; i < headersList.length; i += 2) {
+    headers.append(headersList[i], headersList[i + 1]);
   }
+  // Cloudflare returns a body here, but undici aborts the stream so
+  // unfortunately it's unusable :(
+  const resBody = !nullBodyStatus.includes(baseRes.status)
+    ? baseRes.body
+    : null;
+  const res = new Response(resBody, {
+    status: internalResponse.status,
+    statusText: internalResponse.statusText,
+    headers,
+  });
+  // } else {
+  //   // https://fetch.spec.whatwg.org/#null-body-status
+  //   res = new Response(
+  //     nullBodyStatus.includes(baseRes.status) ? null : baseRes.body,
+  //     baseRes
+  //   );
+  // }
 
   await waitForOpenInputGate();
   return withInputGating(res);
